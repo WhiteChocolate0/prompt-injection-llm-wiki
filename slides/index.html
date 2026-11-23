@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Prompt Injection｜入門教學</title>
+  <style>
+    :root {
+      --ink: #202b38;
+      --muted: #5d6875;
+      --blue: #123c68;
+      --blue-2: #eaf1f7;
+      --line: #d6dee6;
+      --paper: #ffffff;
+      --canvas: #edf1f4;
+      --red: #a83232;
+      --red-bg: #fff2f0;
+      --soft: #f5f7f9;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; }
+    body {
+      background: var(--canvas); color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      overflow: hidden;
+    }
+    .app { height: 100dvh; display: grid; grid-template-rows: 1fr 3.5rem; padding: .5rem 1rem .25rem; }
+    .viewport { min-height: 0; display: grid; place-items: center; }
+    .deck {
+      position: relative; width: min(100%, calc((100dvh - 4.25rem) * 16 / 9));
+      max-height: calc(100dvh - 4.25rem); aspect-ratio: 16 / 9;
+      container-type: size; background: var(--paper); border: 1px solid #d8e0e7;
+      box-shadow: 0 18px 48px rgba(24, 40, 58, .12); overflow: hidden;
+    }
+    .slide {
+      position: absolute; inset: 0; display: none; flex-direction: column;
+      padding: 5.1cqw 6.1cqw 3.2cqw; background: var(--paper); overflow: hidden;
+    }
+    .slide.active { display: flex; }
+    .eyebrow { color: var(--blue); font-size: 1.15cqw; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25cqw; }
+    h1 { color: var(--blue); font-size: 3.45cqw; line-height: 1.16; margin: 0 0 2.3cqw; letter-spacing: -.025em; font-weight: 760; }
+    h2 { color: var(--blue); font-size: 2.05cqw; line-height: 1.25; margin: 0 0 .8cqw; font-weight: 730; }
+    p, li { font-size: 1.55cqw; line-height: 1.55; margin: 0; }
+    .lead { font-size: 1.9cqw; line-height: 1.5; }
+    .small { font-size: 1.15cqw; line-height: 1.45; color: var(--muted); }
+    .body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 1.5cqw; }
+    .source {
+      flex: 0 0 auto; border-top: 1px solid var(--line); padding-top: .9cqw; margin-top: 1.4cqw;
+      font-size: 1.02cqw; line-height: 1.35; color: var(--muted);
+    }
+    .note { color: var(--muted); border-left: .28cqw solid var(--blue); padding: .55cqw 0 .55cqw 1cqw; font-size: 1.13cqw; line-height: 1.4; }
+    .note.warn { color: var(--red); border-color: var(--red); background: var(--red-bg); padding: .7cqw 1cqw; }
+    .pill { display: inline-block; border-radius: 999px; padding: .35em .72em; font-size: .78em; font-weight: 700; color: var(--blue); background: var(--blue-2); }
+    .red { color: var(--red); }
+    .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; gap: 1.15cqw; }
+    .node { border: 1px solid var(--line); border-top: .38cqw solid var(--blue); background: #fff; padding: 1.5cqw; display: flex; flex-direction: column; justify-content: center; gap: .65cqw; min-width: 0; }
+    .node.alert { border-top-color: var(--red); background: #fffafa; }
+    .node p { font-size: 1.42cqw; }
+    .node strong { font-size: 1.65cqw; color: var(--blue); }
+    .arrow { align-self: center; color: var(--blue); font-size: 2.3cqw; font-weight: 700; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5cqw; }
+    .panel { border: 1px solid var(--line); background: var(--soft); padding: 1.55cqw; min-width: 0; }
+    .panel.blue { background: var(--blue-2); }
+    .panel.red-panel { border-color: #e6c6c3; background: var(--red-bg); }
+    .panel h2 { margin-bottom: .8cqw; }
+    .panel ul { list-style: none; padding: 0; display: grid; gap: .75cqw; }
+    .panel li { padding-left: 1.3em; position: relative; }
+    .panel li::before { content: ""; position: absolute; left: .12em; top: .72em; width: .42em; height: .42em; border-radius: 50%; background: var(--blue); }
+    .panel.red-panel li::before { background: var(--red); }
+    .split-path { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5cqw; }
+    .path { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: .8cqw; border: 1px solid var(--line); padding: 1.25cqw; background: var(--soft); }
+    .path .box { text-align: center; padding: 1cqw .7cqw; background: white; border: 1px solid var(--line); font-size: 1.35cqw; font-weight: 650; }
+    .path .line { color: var(--blue); font-size: 1.7cqw; font-weight: 700; }
+    .path.direct { border-left: .4cqw solid var(--blue); }
+    .path.indirect { border-left: .4cqw solid var(--red); }
+    .four-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1cqw; }
+    .risk { min-height: 8.5cqw; display: flex; align-items: center; gap: 1.1cqw; padding: 1.25cqw 1.5cqw; background: var(--soft); border: 1px solid var(--line); }
+    .risk .n { color: var(--red); font-size: 1.1cqw; font-weight: 800; letter-spacing: .08em; }
+    .risk strong { color: var(--blue); font-size: 1.65cqw; display: block; margin-bottom: .2cqw; }
+    .risk span { font-size: 1.2cqw; color: var(--muted); }
+    .defense-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.3cqw; }
+    .defense { border: 1px solid var(--line); padding: 1.5cqw; background: white; min-height: 11.5cqw; }
+    .defense .tag { color: var(--blue); font-size: 1.12cqw; font-weight: 750; margin-bottom: .6cqw; }
+    .defense p { font-size: 1.35cqw; }
+    .method-row { display: flex; flex-wrap: wrap; gap: .6cqw; margin-top: .8cqw; }
+    .method-row span { background: var(--blue-2); color: var(--blue); border-radius: .3cqw; padding: .4cqw .65cqw; font-size: 1.08cqw; font-weight: 650; }
+    .pipeline { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: .9cqw; align-items: center; }
+    .step { min-height: 10cqw; border: 1px solid var(--line); background: var(--soft); padding: 1.15cqw; display: flex; flex-direction: column; justify-content: center; gap: .55cqw; text-align: center; }
+    .step b { color: var(--blue); font-size: 1.42cqw; }
+    .step span { font-size: 1.1cqw; color: var(--muted); line-height: 1.4; }
+    .step-mark { color: var(--blue); font-size: 2cqw; }
+    .limits-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .limits-table th { text-align: left; background: var(--blue); color: white; font-size: 1.17cqw; padding: .8cqw .95cqw; }
+    .limits-table td { vertical-align: top; border-bottom: 1px solid var(--line); padding: .82cqw .95cqw; font-size: 1.15cqw; line-height: 1.4; }
+    .limits-table tr:nth-child(even) td { background: var(--soft); }
+    .limits-table td:first-child { font-weight: 700; color: var(--blue); width: 24%; }
+    .metric-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5cqw; }
+    .metric { background: var(--blue-2); border: 1px solid #c7d7e6; padding: 1.65cqw; text-align: center; }
+    .metric .value { color: var(--blue); font-weight: 800; font-size: 3.5cqw; line-height: 1.1; }
+    .metric .label { margin-top: .7cqw; font-size: 1.25cqw; line-height: 1.4; }
+    .metric.alt { background: #f5f7f9; border-color: var(--line); }
+    .metric.alt .value { color: var(--ink); }
+    .closing { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; gap: 1.2cqw; }
+    .closing .panel { display: flex; flex-direction: column; justify-content: center; gap: 1cqw; min-height: 14cqw; }
+    .closing .status { align-self: center; text-align: center; padding: 1cqw; border: 1px solid #c7d7e6; background: var(--blue-2); color: var(--blue); font-size: 1.5cqw; font-weight: 800; line-height: 1.45; }
+    .toolbar { display: flex; align-items: center; justify-content: center; gap: 1.25rem; color: var(--ink); }
+    button { border: 1px solid #c5d0da; background: white; color: var(--blue); border-radius: .45rem; padding: .55rem 1.15rem; font: inherit; font-weight: 650; cursor: pointer; }
+    button:hover { background: var(--blue-2); }
+    button:focus-visible { outline: 3px solid #6b9ac5; outline-offset: 2px; }
+    button:disabled { color: #7b8792; cursor: default; background: #f2f4f6; }
+    .counter { min-width: 4.4rem; text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--blue); }
+    .hint { color: var(--muted); font-size: .8rem; }
+    @media (max-width: 640px) {
+      .app { padding-left: .25rem; padding-right: .25rem; grid-template-rows: 1fr 3.2rem; }
+      .deck { width: min(100%, calc((100dvh - 3.9rem) * 16 / 9)); max-height: calc(100dvh - 3.9rem); }
+      .hint { display: none; }
+      button { padding: .48rem .9rem; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .slide.active { animation: appear .16s ease-out; }
+      @keyframes appear { from { opacity: .7; } to { opacity: 1; } }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" aria-label="Prompt Injection 教學簡報">
+    <div class="viewport">
+      <div class="deck" id="deck" aria-live="polite">
+        <section class="slide active" aria-label="第 1 頁，共 9 頁">
+          <div class="eyebrow">Prompt Injection · 入門教學</div>
+          <h1>Prompt Injection 是什麼？</h1>
+          <div class="body">
+            <p class="lead">把指令放進模型正在處理的輸入或資料；若模型把它當成應遵循的指令，可能偏離原本任務。</p>
+            <div class="flow" aria-label="任務指令與含指令資料可能使模型偏離任務的流程圖">
+              <div class="node"><strong>原本任務</strong><p>整理郵件</p></div><div class="arrow" aria-hidden="true">＋</div>
+              <div class="node alert"><strong class="red">待處理資料</strong><p>郵件內容藏有另一段指令</p></div><div class="arrow" aria-hidden="true">→</div>
+              <div class="node"><strong>模型</strong><p>可能偏離原本任務</p></div>
+            </div>
+            <div class="note">郵件助理為 AgentDojo 測試情境，不代表所有郵件助理都會如此。</div>
+          </div>
+          <footer class="source">來源：S2，PDF pp. 1–2（Figure 1）；S6，PDF pp. 1–2。</footer>
+        </section>
+
+        <section class="slide" aria-label="第 2 頁，共 9 頁">
+          <div class="eyebrow">02 · 易受影響的原因</div>
+          <h1>為什麼 LLM 容易受到影響？</h1>
+          <div class="body">
+            <div class="two-col">
+              <div class="panel blue"><h2>要遵循的指令</h2><p>例如：請摘要郵件</p></div>
+              <div class="panel"><h2>要處理的資料</h2><p>例如：郵件正文</p></div>
+            </div>
+            <div class="path"><div class="box">任務指令</div><div class="line">＋</div><div class="box">待處理資料</div></div>
+            <p class="lead">常見輸入形式沒有可靠邊界，讓模型在所有情況下都正確分辨兩者。</p>
+            <div class="note">資料中的命令式文字可能被當成新指令。</div>
+          </div>
+          <footer class="source">來源：S2，PDF p. 1；S5，PDF p. 1；S6，PDF pp. 1–2。</footer>
+        </section>
+
+        <section class="slide" aria-label="第 3 頁，共 9 頁">
+          <div class="eyebrow">03 · 攻擊類型</div>
+          <h1>Direct 與 Indirect Prompt Injection</h1>
+          <div class="body">
+            <div class="split-path">
+              <div class="panel blue"><span class="pill">DIRECT</span><h2 style="margin-top:.8cqw">直接輸入</h2>
+                <div class="path direct"><div class="box">主要使用者<br>query／input</div><div class="line">→</div><div class="box">模型</div></div>
+                <p style="margin-top:1cqw">使用者直接輸入企圖蓋過原任務的命令。</p>
+              </div>
+              <div class="panel"><span class="pill" style="color:var(--red);background:var(--red-bg)">INDIRECT</span><h2 style="margin-top:.8cqw">外部資料帶入</h2>
+                <div class="path indirect"><div class="box">外部／第三方資料</div><div class="line">→</div><div class="box">模型</div></div>
+                <p style="margin-top:1cqw">使用者可能沒有提供或看見其中的指令。</p>
+              </div>
+            </div>
+            <div class="note warn">來源對 Direct 與相關術語的分類範圍不完全一致；此為入門對照，不合併成唯一分類。</div>
+          </div>
+          <footer class="source">來源：S1，PDF p. 3（含註 1）；S2，PDF p. 2；S3，PDF pp. 1–3；S5，PDF p. 2。</footer>
+        </section>
+
+        <section class="slide" aria-label="第 4 頁，共 9 頁">
+          <div class="eyebrow">04 · 安全風險</div>
+          <h1>Prompt Injection 可能帶來哪些安全風險？</h1>
+          <div class="body">
+            <div class="four-grid">
+              <div class="risk"><span class="n">01</span><div><strong>Availability</strong><span>可用性受損</span></div></div>
+              <div class="risk"><span class="n">02</span><div><strong>Integrity</strong><span>輸出或系統完整性受影響</span></div></div>
+              <div class="risk"><span class="n">03</span><div><strong>Privacy</strong><span>隱私或資料受損</span></div></div>
+              <div class="risk"><span class="n">04</span><div><strong>Misuse</strong><span>促成不當使用</span></div></div>
+            </div>
+            <div class="panel red-panel"><div class="tag red">論文討論／示例</div><p>資料外洩 · 工具操作 · 遠端影響 · 錯誤摘要</p></div>
+            <div class="note">分類與論文示例用途不同；測試／示範不等於普遍實際事件。</div>
+          </div>
+          <footer class="source">來源：S1，PDF p. 3；S2，PDF pp. 1–2；S3，PDF pp. 1–3、9。</footer>
+        </section>
+
+        <section class="slide" aria-label="第 5 頁，共 9 頁">
+          <div class="eyebrow">05 · 防禦方法</div>
+          <h1>防禦方向一：分清指令與資料</h1>
+          <div class="body">
+            <div class="defense-grid">
+              <div class="defense"><div class="tag">STRUCTURED QUERIES · StruQ</div><h2>把 prompt 與 data 分開</h2><p>分開編碼，並以 structured instruction tuning 訓練模型遵從 prompt 部分。</p></div>
+              <div class="defense"><div class="tag">SPOTLIGHTING</div><h2>提供資料來源線索</h2><p>轉換外部輸入，讓模型更容易辨識外部資料。</p>
+                <div class="method-row"><span>Delimiting</span><span>Datamarking</span><span>Encoding</span></div>
+              </div>
+            </div>
+            <div class="note">兩種方向不同，適用情境與實驗設定也不同。</div>
+          </div>
+          <footer class="source">來源：S6，PDF pp. 7–8；S5，PDF pp. 2–3。</footer>
+        </section>
+
+        <section class="slide" aria-label="第 6 頁，共 9 頁">
+          <div class="eyebrow">06 · Agent 流程防禦</div>
+          <h1>防禦方向二：限制或檢查工具流程</h1>
+          <div class="body">
+            <div class="pipeline">
+              <div class="step"><b>Tool filtering</b><span>事先選定任務所需工具</span></div><div class="step-mark">→</div>
+              <div class="step"><b>Prompt injection detector</b><span>檢查工具輸出；偵測到注入時中止</span></div><div class="step-mark">→</div>
+              <div class="step"><b>Prompt sandwiching</b><span>工具呼叫後重申使用者任務</span></div>
+            </div>
+            <div class="note warn"><strong>Least Privilege：</strong>資料不足；不可直接把它等同於 tool filtering。</div>
+          </div>
+          <footer class="source">來源：S2，PDF pp. 8–9。</footer>
+        </section>
+
+        <section class="slide" aria-label="第 7 頁，共 9 頁">
+          <div class="eyebrow">07 · 方法本身的限制</div>
+          <h1>防禦方法各有適用範圍</h1>
+          <div class="body">
+            <table class="limits-table">
+              <thead><tr><th style="width:25%">方法</th><th>已知限制</th></tr></thead>
+              <tbody>
+                <tr><td>Delimiting</td><td>攻擊者仿造界定符可能造成混淆。</td></tr>
+                <tr><td>Datamarking</td><td>靜態標記若只處理空格，可能漏掉無空格文字。</td></tr>
+                <tr><td>Encoding</td><td>較弱模型可能解碼或完成下游任務時出錯。</td></tr>
+                <tr><td>Tool filtering</td><td>受工具需求能否事先規劃，以及正常任務與攻擊是否共用工具所限。</td></tr>
+                <tr><td>Detector／StruQ</td><td>Detector 可能誤判正常內容；StruQ 有其適用範圍。</td></tr>
+              </tbody>
+            </table>
+            <div class="note">本頁聚焦各方法的質性限制；實驗數字與設定見下一頁。</div>
+          </div>
+          <footer class="source">來源：S5，PDF pp. 4–6；S2，PDF p. 9；S6，PDF pp. 10、14。</footer>
+        </section>
+
+        <section class="slide" aria-label="第 8 頁，共 9 頁">
+          <div class="eyebrow">08 · 實驗設定與數字解讀</div>
+          <h1>防禦效果要看測試設定</h1>
+          <div class="body">
+            <p class="lead">實驗結果只描述特定模型、任務與 benchmark；不同研究不可直接合併比較。</p>
+            <div class="metric-pair">
+              <div class="metric"><div class="value">約 7.5%</div><div class="label">AgentDojo 正文敘述<br>tool filter</div></div>
+              <div class="metric alt"><div class="value">6.84%</div><div class="label">AgentDojo Table 5<br>tool filter</div></div>
+            </div>
+            <div class="note warn">同篇論文不同位置的數字分開保留；不平均、不合併，也不選一個代表整篇論文。</div>
+          </div>
+          <footer class="source">來源：S2，PDF pp. 6、9、20；S5，PDF pp. 4–5；S6，PDF pp. 10、14。</footer>
+        </section>
+
+        <section class="slide" aria-label="第 9 頁，共 9 頁">
+          <div class="eyebrow">09 · 結論與證據邊界</div>
+          <h1>目前能否說「已經完全防禦」？</h1>
+          <div class="body">
+            <div class="closing">
+              <div class="panel"><span class="pill">目前知道</span><p>多種防禦方法有具體限制與部分未解問題。</p></div>
+              <div class="status">資料不足<br>／尚無定論</div>
+              <div class="panel"><span class="pill">仍未確定</span><p>是否能防禦所有 Prompt Injection，或有適用所有系統的完整解法。</p></div>
+            </div>
+            <div class="note">不能據此說「已證明完全防禦不可能」，也不能宣稱已有完整防禦。</div>
+          </div>
+          <footer class="source">來源：S2，PDF pp. 9、20；S5，PDF pp. 4–6；S6，PDF pp. 10、14。</footer>
+        </section>
+      </div>
+    </div>
+    <nav class="toolbar" aria-label="投影片控制">
+      <button id="prev" type="button" aria-label="上一頁">← 上一頁</button>
+      <span class="counter" id="counter" aria-live="polite">1 / 9</span>
+      <button id="next" type="button" aria-label="下一頁">下一頁 →</button>
+      <span class="hint">使用 ← → 方向鍵切換</span>
+    </nav>
+  </main>
+  <script>
+    (() => {
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const prev = document.getElementById('prev');
+      const next = document.getElementById('next');
+      const counter = document.getElementById('counter');
+      let current = 0;
+      function show(index) {
+        current = Math.max(0, Math.min(slides.length - 1, index));
+        slides.forEach((slide, i) => {
+          const active = i === current;
+          slide.classList.toggle('active', active);
+          slide.setAttribute('aria-hidden', String(!active));
+        });
+        counter.textContent = `${current + 1} / ${slides.length}`;
+        prev.disabled = current === 0;
+        next.disabled = current === slides.length - 1;
+      }
+      prev.addEventListener('click', () => show(current - 1));
+      next.addEventListener('click', () => show(current + 1));
+      document.addEventListener('keydown', event => {
+        if (event.key === 'ArrowRight') { event.preventDefault(); show(current + 1); }
+        if (event.key === 'ArrowLeft') { event.preventDefault(); show(current - 1); }
+      });
+      show(0);
+    })();
+  </script>
+</body>
+</html>
