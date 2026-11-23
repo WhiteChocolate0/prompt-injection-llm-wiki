@@ -18,3 +18,6 @@ node_modules/
 # Raw ingest and exports
 /raw/
 /exports/
+
+*.pdf
+.DS_Store
